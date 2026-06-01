@@ -21,11 +21,13 @@ class DatrisRunTapOperator(BaseOperator):
     :param datris_conn_id: Airflow connection id (type ``datris``).
     :param wait_for_completion: poll the pipeline until it finishes (default).
     :param poll_interval: seconds between status polls.
-    :param params: per-run parameters forwarded to the tap script as env vars.
+    :param tap_params: per-run parameters forwarded to the tap script as env vars.
         Templated, so ``{"since": "{{ ds }}"}`` works for date-windowed backfills.
+        (Named ``tap_params`` rather than ``params`` because ``params`` is a
+        reserved BaseOperator attribute and cannot be a templated field.)
     """
 
-    template_fields: Sequence[str] = ("tap_name", "params")
+    template_fields: Sequence[str] = ("tap_name", "tap_params")
     ui_color = "#6366f1"
 
     def __init__(
@@ -35,7 +37,7 @@ class DatrisRunTapOperator(BaseOperator):
         datris_conn_id: str = DatrisHook.default_conn_name,
         wait_for_completion: bool = True,
         poll_interval: int = 15,
-        params: dict | None = None,
+        tap_params: dict | None = None,
         **kwargs: Any,
     ) -> None:
         super().__init__(**kwargs)
@@ -43,7 +45,7 @@ class DatrisRunTapOperator(BaseOperator):
         self.datris_conn_id = datris_conn_id
         self.wait_for_completion = wait_for_completion
         self.poll_interval = poll_interval
-        self.run_params = params
+        self.tap_params = tap_params
         self._hook: DatrisHook | None = None
         self._pipeline_tokens: list[str] = []
 
@@ -56,7 +58,7 @@ class DatrisRunTapOperator(BaseOperator):
     # ── execution ─────────────────────────────────────────────────
     def execute(self, context: Any) -> dict:
         self.log.info("Triggering Datris tap '%s'", self.tap_name)
-        resp = self.hook.run_tap(self.tap_name, mode="run", params=self.run_params)
+        resp = self.hook.run_tap(self.tap_name, mode="run", params=self.tap_params)
 
         # Server-side debounce: a retry that lands inside the window is reported
         # as skipped. The in-flight run is the real one — succeed with a warning

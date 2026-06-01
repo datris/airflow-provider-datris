@@ -86,6 +86,25 @@ def test_no_wait_skips_polling():
     op.hook.get_pipeline_status.assert_not_called()
 
 
+def test_params_not_in_template_fields_uses_tap_params():
+    # Regression: `params` is a reserved BaseOperator attribute and must NOT be
+    # a templated field (it breaks DAG serialization). The operator exposes
+    # `tap_params` instead and forwards it to the REST `params` field.
+    assert "params" not in DatrisRunTapOperator.template_fields
+    assert "tap_params" in DatrisRunTapOperator.template_fields
+
+    op = _operator(tap_params={"since": "2026-05-01"})
+    op.hook.run_tap.return_value = {"status": "started", "publisherToken": "pub-1"}
+    op.hook.get_pipeline_status.return_value = {
+        "rollup": {"allDone": True, "status": "success", "jobs": []},
+        "events": [],
+    }
+    op.execute(context={})
+    op.hook.run_tap.assert_called_once_with(
+        "my_tap", mode="run", params={"since": "2026-05-01"}
+    )
+
+
 def test_on_kill_cancels_tracked_jobs():
     op = _operator()
     op._pipeline_tokens = ["pipe-1", "pipe-2"]

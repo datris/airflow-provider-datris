@@ -46,7 +46,7 @@ ingest = DatrisRunTapOperator(
     datris_conn_id="datris_default",
     wait_for_completion=True,
     poll_interval=15,
-    params={"since": "{{ ds }}"},  # optional per-run params (env vars in the tap)
+    tap_params={"since": "{{ ds }}"},  # optional per-run params (env vars in the tap)
 )
 ```
 
