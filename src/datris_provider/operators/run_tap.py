@@ -48,6 +48,7 @@ class DatrisRunTapOperator(BaseOperator):
         self.tap_params = tap_params
         self._hook: DatrisHook | None = None
         self._pipeline_tokens: list[str] = []
+        self._t0: float | None = None
 
     @property
     def hook(self) -> DatrisHook:
@@ -57,6 +58,7 @@ class DatrisRunTapOperator(BaseOperator):
 
     # ── execution ─────────────────────────────────────────────────
     def execute(self, context: Any) -> dict:
+        self._t0 = time.monotonic()
         self.log.info("Triggering Datris tap '%s'", self.tap_name)
         resp = self.hook.run_tap(self.tap_name, mode="run", params=self.tap_params)
 
@@ -136,6 +138,11 @@ class DatrisRunTapOperator(BaseOperator):
     def _result(self, resp: dict, publisher_token: str | None, rollup: dict | None) -> dict:
         jobs = (rollup or {}).get("jobs", []) or []
         row_count = sum(int(j.get("recordCount", 0) or 0) for j in jobs) or resp.get("recordCount")
+        # duration_ms is the operator's own wall-clock for the trigger→terminal
+        # span. The Datris rollup reports per-job `elapsed` strings (no single
+        # total), surfaced separately as job_elapsed.
+        duration_ms = round((time.monotonic() - self._t0) * 1000) if self._t0 else None
+
         # Returned dict is auto-pushed to XCom as ``return_value`` (do_xcom_push),
         # so downstream tasks can read publisher_token / pipeline_tokens / metrics.
         return {
@@ -143,7 +150,8 @@ class DatrisRunTapOperator(BaseOperator):
             "pipeline_tokens": self._pipeline_tokens
             or [j["pipelineToken"] for j in jobs if j.get("pipelineToken")],
             "row_count": row_count,
-            "duration_ms": (rollup or {}).get("totalTime") or resp.get("durationMs"),
+            "duration_ms": duration_ms,
+            "job_elapsed": [j.get("elapsed") for j in jobs if j.get("elapsed")],
             "status": (rollup or {}).get("status") or resp.get("status"),
         }
 

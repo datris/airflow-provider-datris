@@ -29,9 +29,9 @@ def test_happy_path_polls_to_success():
         {"rollup": {"allDone": False, "status": "processing",
                     "jobs": [{"pipelineToken": "pipe-1", "status": "processing"}]},
          "events": [{"message": "fetching"}]},
-        {"rollup": {"allDone": True, "status": "success", "totalTime": 1234,
+        {"rollup": {"allDone": True, "status": "success",
                     "jobs": [{"pipelineToken": "pipe-1", "status": "success",
-                              "recordCount": 42}]},
+                              "recordCount": 42, "elapsed": "1.81 sec"}]},
          "events": [{"message": "fetching"}, {"message": "done"}]},
     ]
 
@@ -40,7 +40,9 @@ def test_happy_path_polls_to_success():
     assert result["publisher_token"] == "pub-1"
     assert result["pipeline_tokens"] == ["pipe-1"]
     assert result["row_count"] == 42
-    assert result["duration_ms"] == 1234
+    # duration_ms is the operator's wall-clock (poll_interval=0 → small but set)
+    assert result["duration_ms"] is not None and result["duration_ms"] >= 0
+    assert result["job_elapsed"] == ["1.81 sec"]
     assert result["status"] == "success"
 
 
