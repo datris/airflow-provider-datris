@@ -19,6 +19,8 @@ def _operator(**kwargs):
         task_id="t", tap_name="my_tap", poll_interval=0, **kwargs
     )
     op._hook = mock.Mock()
+    # Default: tap has no cron, so the scheduler guard lets it through.
+    op._hook.get_tap.return_value = {}
     return op
 
 
@@ -105,6 +107,29 @@ def test_params_not_in_template_fields_uses_tap_params():
     op.hook.run_tap.assert_called_once_with(
         "my_tap", mode="run", params={"since": "2026-05-01"}
     )
+
+
+def test_refuses_when_tap_has_cron():
+    # Scheduler guard: a tap with a Datris cron is already scheduled by Datris,
+    # so the operator must refuse to trigger it (no double-firing).
+    op = _operator()
+    op.hook.get_tap.return_value = {"cronExpression": "0 0 2 * * ?"}
+    with pytest.raises(AirflowException, match="already scheduled by Datris"):
+        op.execute(context={})
+    op.hook.run_tap.assert_not_called()
+
+
+def test_triggers_when_cron_empty():
+    # Blank/whitespace cron is treated as no schedule → trigger proceeds.
+    op = _operator()
+    op.hook.get_tap.return_value = {"cronExpression": "  "}
+    op.hook.run_tap.return_value = {"status": "started", "publisherToken": "pub-1"}
+    op.hook.get_pipeline_status.return_value = {
+        "rollup": {"allDone": True, "status": "success", "jobs": []},
+        "events": [],
+    }
+    op.execute(context={})
+    op.hook.run_tap.assert_called_once()
 
 
 def test_on_kill_cancels_tracked_jobs():

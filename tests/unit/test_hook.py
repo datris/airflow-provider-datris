@@ -77,6 +77,19 @@ def test_pipeline_status_passes_rollup_param():
 
 
 @responses.activate
+def test_get_tap_returns_config():
+    responses.get(
+        "https://datris.test/api/v1/tap",
+        json={"name": "my_tap", "cronExpression": "0 0 2 * * ?"},
+        status=200,
+    )
+    hook = _hook()
+    out = hook.get_tap("my_tap")
+    assert out["cronExpression"] == "0 0 2 * * ?"
+    assert "name=my_tap" in responses.calls[0].request.url
+
+
+@responses.activate
 def test_kill_job_posts_token():
     responses.post(
         "https://datris.test/api/v1/job/kill", json={"cancelled": True}, status=200

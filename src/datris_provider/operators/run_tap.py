@@ -59,6 +59,19 @@ class DatrisRunTapOperator(BaseOperator):
     # ── execution ─────────────────────────────────────────────────
     def execute(self, context: Any) -> dict:
         self._t0 = time.monotonic()
+
+        # One scheduler at a time. If the tap carries a Datris cron, Datris's
+        # built-in scheduler already runs it — triggering from Airflow too would
+        # double-fire. Refuse, and tell the user how to resolve it.
+        tap = self.hook.get_tap(self.tap_name)
+        cron = (tap.get("cronExpression") or "").strip()
+        if cron:
+            raise AirflowException(
+                f"Tap '{self.tap_name}' has a Datris cron schedule ('{cron}') and is "
+                f"already scheduled by Datris. Remove the tap's cron to let Airflow "
+                f"drive it, or remove this DAG and let Datris run it on its schedule."
+            )
+
         self.log.info("Triggering Datris tap '%s'", self.tap_name)
         resp = self.hook.run_tap(self.tap_name, mode="run", params=self.tap_params)
 

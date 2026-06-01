@@ -61,10 +61,17 @@ ingest = DatrisRunTapOperator(
   as success-with-warning.
 - On Airflow task kill/timeout, calls `POST /job/kill` for the in-flight jobs.
 
-### Tip: avoid double-firing
+### One scheduler at a time
 
-If a tap is driven by Airflow, mark it **externally scheduled** in Datris so the
-built-in scheduler doesn't also fire it.
+A tap is scheduled by **either** Datris **or** Airflow, never both. The operator
+enforces this from the tap's cron:
+
+- Tap **has a cron** → Datris already schedules it → the operator **refuses to
+  trigger** and fails the task.
+- Tap **has no cron** (manual-only) → Airflow drives it → the operator triggers
+  it normally.
+
+To run a tap from Airflow, leave its cron empty in Datris.
 
 ## Development
 

@@ -79,6 +79,10 @@ class DatrisHook(BaseHook):
             return resp.text
 
     # ── endpoints ─────────────────────────────────────────────────
+    def get_tap(self, name: str) -> dict:
+        """Return a tap's saved configuration (includes ``cronExpression``)."""
+        return self._request("GET", "tap", params={"name": name}) or {}
+
     def run_tap(
         self, name: str, mode: str = "run", params: dict | None = None
     ) -> dict:
