@@ -82,4 +82,4 @@ pytest
 
 ## License
 
-Apache-2.0. The Datris engine itself is licensed separately (AGPL-3.0).
+Apache-2.0. The Datris platform is also Apache-2.0 licensed as of its current release; earlier platform releases shipped under AGPL-3.0.
